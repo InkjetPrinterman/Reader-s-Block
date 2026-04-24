@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>eBooks</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────────── -->
+  <header id="app-header">
+    <button id="btn-back" class="icon-btn" title="Back" hidden>&#8592;</button>
+    <span id="feed-title">eBooks</span>
+    <button id="btn-bookmarks" class="icon-btn" title="Bookmarks">&#9733;</button>
+    <button id="btn-randomizer" class="icon-btn randomizer-btn" title="Randomizer: Off">&#9684;</button>
+    <span id="rand-countdown" class="rand-countdown" hidden></span>
+    <button id="btn-overlay-toggle" class="icon-btn overlay-toggle-btn" title="Overlay: On">&#9646;&#9646;</button>
+    <button id="btn-settings" class="icon-btn" title="Settings">&#9881;</button>
+  </header>
+
+  <!-- ── Settings panel ─────────────────────────────────────────────────── -->
+  <div id="settings-panel" hidden>
+    <div class="settings-row">
+      <div class="settings-label-row">
+        <span class="settings-label">Overlay font size</span>
+        <span id="settings-font-value">28px</span>
+      </div>
+      <div class="settings-font-controls">
+        <button id="settings-font-down" class="icon-btn" title="Decrease">A−</button>
+        <input
+          id="settings-font-slider"
+          type="range"
+          min="9" max="48" step="1" value="28"
+        />
+        <button id="settings-font-up" class="icon-btn" title="Increase">A+</button>
+      </div>
+    </div>
+    <div class="settings-row settings-row--bordered">
+      <div class="settings-label-row">
+        <span class="settings-label">Chunk size</span>
+        <span id="settings-chunk-value">150 words</span>
+      </div>
+      <div class="settings-font-controls">
+        <button id="settings-chunk-down" class="icon-btn" title="Fewer words per chunk">−</button>
+        <input
+          id="settings-chunk-slider"
+          type="range"
+          min="50" max="600" step="25" value="150"
+        />
+        <button id="settings-chunk-up" class="icon-btn" title="More words per chunk">+</button>
+      </div>
+    </div>
+    <div class="settings-row settings-row--bordered">
+      <div class="settings-label-row">
+        <span class="settings-label">Background blur</span>
+        <span id="settings-blur-value">20</span>
+      </div>
+      <div class="settings-font-controls">
+        <button id="settings-blur-down" class="icon-btn" title="Less blur">−</button>
+        <input
+          id="settings-blur-slider"
+          type="range"
+          min="0" max="20" step="1" value="20"
+        />
+        <button id="settings-blur-up" class="icon-btn" title="More blur">+</button>
+      </div>
+    </div>
+    <div class="settings-row settings-row--bordered">
+      <div class="settings-label-row">
+        <span class="settings-label">Randomizer frequency</span>
+        <span id="settings-rand-value">6×/3h</span>
+      </div>
+      <div class="settings-font-controls">
+        <button id="settings-rand-down" class="icon-btn" title="Less frequent">−</button>
+        <input
+          id="settings-rand-slider"
+          type="range"
+          min="1" max="50" step="1" value="6"
+        />
+        <button id="settings-rand-up" class="icon-btn" title="More frequent">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Search bar ─────────────────────────────────────────────────────── -->
+  <div id="search-bar">
+    <input
+      id="search-input"
+      type="search"
+      placeholder="Search titles, authors…"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <button id="btn-search">Go</button>
+  </div>
+
+  <!-- ── Main content area ──────────────────────────────────────────────── -->
+  <main id="content">
+    <div id="nav-list" hidden></div>
+    <div id="book-list" hidden></div>
+    <div id="bookmarks-view" hidden></div>
+  </main>
+
+  <!-- ── Book detail panel (slides in) ─────────────────────────────────── -->
+  <aside id="detail-panel" hidden>
+    <button id="btn-close-detail" class="icon-btn close-btn">&#10005;</button>
+    <div id="detail-content"></div>
+  </aside>
+
+  <!-- ── Full text reader panel ────────────────────────────────────────── -->
+  <aside id="reader-panel" hidden>
+    <div id="reader-header">
+      <button id="btn-close-reader" class="icon-btn">&#10005;</button>
+      <span id="reader-title"></span>
+      <div id="reader-controls">
+        <button id="btn-font-down" class="icon-btn" title="Smaller text">A−</button>
+        <button id="btn-font-up"   class="icon-btn" title="Larger text">A+</button>
+      </div>
+    </div>
+    <div id="reader-loading" hidden>
+      <div class="spinner"></div>
+      <span>Fetching book text…</span>
+    </div>
+    <div id="reader-error" hidden></div>
+    <pre id="reader-body"></pre>
+  </aside>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

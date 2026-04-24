@@ -1,0 +1,644 @@
+/* ── Reset & base ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Ensure [hidden] always wins over any display:flex/block rules */
+[hidden] { display: none !important; }
+
+:root {
+  --bg        : #ffffff;
+  --bg-alt    : #f5f4f0;
+  --bg-card   : #ffffff;
+  --border    : rgba(0,0,0,0.10);
+  --text      : #1a1a1a;
+  --text-2    : #555;
+  --text-3    : #888;
+  --accent    : #1a6b3c;
+  --accent-lt : #e8f4ee;
+  --danger    : #c0392b;
+  --radius    : 8px;
+  --radius-lg : 12px;
+  --shadow    : 0 1px 4px rgba(0,0,0,0.10);
+  --reader-font-size: 13px;
+  --overlay-btn: #3a2f6e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg        : #1c1c1e;
+    --bg-alt    : #2c2c2e;
+    --bg-card   : #2c2c2e;
+    --border    : rgba(255,255,255,0.10);
+    --text      : #f0f0f0;
+    --text-2    : #aaa;
+    --text-3    : #666;
+    --accent    : #4caf78;
+    --accent-lt : #1a3328;
+    --overlay-btn: #5c4fcf;
+  }
+}
+
+body {
+  width: 420px;
+  min-height: 560px;
+  max-height: 640px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+#app-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+#feed-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.icon-btn {
+  background: none;
+  border: 0.5px solid var(--border);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  font-weight: 600;
+}
+.icon-btn:hover { background: var(--bg-alt); }
+
+/* ── Settings panel ──────────────────────────────────────────────────────── */
+#settings-panel {
+  background: var(--bg-alt);
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+  animation: settingsDrop 0.16s ease;
+  overflow: hidden;
+}
+
+@keyframes settingsDrop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.settings-row {
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-row--bordered {
+  border-top: 0.5px solid var(--border);
+}
+
+.settings-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.01em;
+}
+
+#settings-font-value,
+#settings-chunk-value,
+#settings-blur-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-font-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#settings-font-slider,
+#settings-chunk-slider,
+#settings-blur-slider,
+#settings-rand-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+  /* filled track via inline style set from JS */
+}
+
+#settings-font-slider::-webkit-slider-thumb,
+#settings-chunk-slider::-webkit-slider-thumb,
+#settings-blur-slider::-webkit-slider-thumb,
+#settings-rand-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+#settings-font-slider::-webkit-slider-thumb:hover,
+#settings-chunk-slider::-webkit-slider-thumb:hover,
+#settings-blur-slider::-webkit-slider-thumb:hover,
+#settings-rand-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+#settings-font-slider::-moz-range-thumb,
+#settings-chunk-slider::-moz-range-thumb,
+#settings-blur-slider::-moz-range-thumb,
+#settings-rand-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  cursor: pointer;
+}
+
+/* Overlay toggle button */
+.overlay-toggle-btn { font-size: 10px; letter-spacing: -1px; }
+.overlay-toggle-btn.off {
+  background: var(--bg-alt);
+  color: var(--text-3);
+  border-color: var(--border);
+  opacity: 0.6;
+}
+.overlay-toggle-btn.on {
+  background: var(--accent-lt);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Active state on the cog button when settings are open */
+#btn-settings.active {
+  background: var(--accent-lt);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Randomizer button */
+.randomizer-btn { font-size: 13px; }
+.randomizer-btn.off {
+  background: var(--bg-alt);
+  color: var(--text-3);
+  border-color: var(--border);
+  opacity: 0.6;
+}
+.randomizer-btn.on {
+  background: var(--accent-lt);
+  color: var(--accent);
+  border-color: var(--accent);
+  animation: randPulse 2s ease-in-out infinite;
+}
+@keyframes randPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(26, 107, 60, 0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(26, 107, 60, 0); }
+}
+
+/* Popup countdown — "on in M:SS" / "off in M:SS" shown next to randomizer button */
+.rand-countdown {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+/* ── Search bar ──────────────────────────────────────────────────────────── */
+#search-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+#search-input {
+  flex: 1;
+  background: var(--bg-alt);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+#search-input:focus { border-color: var(--accent); }
+
+#btn-search {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+#btn-search:hover { opacity: 0.85; }
+
+/* ── Main content ────────────────────────────────────────────────────────── */
+#content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+  position: relative;
+}
+
+#content::-webkit-scrollbar { width: 4px; }
+#content::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+/* ── Nav entries ─────────────────────────────────────────────────────────── */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 0.5px solid var(--border);
+  transition: background 0.12s;
+}
+.nav-item:hover { background: var(--bg-alt); }
+.nav-item:last-child { border-bottom: none; }
+
+.nav-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: var(--accent-lt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.nav-text strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.nav-text span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+.nav-chevron {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* ── Book cards ──────────────────────────────────────────────────────────── */
+.book-card {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 0.5px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+  align-items: flex-start;
+}
+.book-card:hover { background: var(--bg-alt); }
+.book-card:last-child { border-bottom: none; }
+
+.book-cover {
+  width: 44px;
+  height: 60px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 0.5px solid var(--border);
+  background: var(--bg-alt);
+}
+.book-cover-placeholder {
+  width: 44px;
+  height: 60px;
+  border-radius: 4px;
+  background: var(--accent-lt);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: 0.5px solid var(--border);
+}
+
+.book-meta { flex: 1; min-width: 0; }
+.book-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.book-author {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.book-summary {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+.book-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.tag {
+  font-size: 10px;
+  background: var(--bg-alt);
+  border: 0.5px solid var(--border);
+  border-radius: 99px;
+  padding: 1px 6px;
+  color: var(--text-3);
+}
+
+.bookmark-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-3);
+  font-size: 16px;
+  padding: 2px;
+  flex-shrink: 0;
+  align-self: center;
+  transition: color 0.15s;
+}
+.bookmark-btn.active { color: #e6a817; }
+.bookmark-btn:hover  { color: #e6a817; }
+
+/* ── Detail panel ────────────────────────────────────────────────────────── */
+#detail-panel {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  z-index: 10;
+  overflow-y: auto;
+  padding: 14px;
+  animation: slideIn 0.2s ease;
+}
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: none; } }
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+}
+
+#detail-content .detail-cover {
+  width: 80px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 0.5px solid var(--border);
+  margin-bottom: 12px;
+}
+#detail-content h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+#detail-content .detail-author {
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+#detail-content .detail-summary {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.detail-subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+.download-links {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.dl-btn {
+  display: block;
+  text-align: center;
+  padding: 8px 0;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.dl-btn:hover { opacity: 0.85; }
+.dl-btn.secondary {
+  background: var(--bg-alt);
+  color: var(--text);
+  border: 0.5px solid var(--border);
+}
+
+/* ── Read TXT button ─────────────────────────────────────────────────────── */
+.read-txt-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 9px 0;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  background: #2b5278;
+  color: #fff;
+  transition: opacity 0.15s;
+  letter-spacing: 0.03em;
+}
+.read-txt-btn:hover:not(:disabled) { opacity: 0.85; }
+.read-txt-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ── Read on Page (overlay) button ──────────────────────────────────────── */
+.overlay-btn {
+  background: var(--overlay-btn);
+}
+
+.view-online {
+  text-align: center;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.view-online a { color: var(--accent); text-decoration: none; }
+
+/* ── Bookmarks view ──────────────────────────────────────────────────────── */
+.empty-bookmarks {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+/* ── Reader panel ────────────────────────────────────────────────────────── */
+#reader-panel {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.2s ease;
+}
+
+#reader-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+#reader-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#reader-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+#reader-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#reader-error {
+  flex: 1;
+  padding: 20px 16px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+#reader-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 16px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: var(--reader-font-size);
+  line-height: 1.75;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg);
+  tab-size: 4;
+}
+
+#reader-body::-webkit-scrollbar { width: 4px; }
+#reader-body::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+/* ── Transparent text overlay button ────────────────────────────────────── */
+.transparent-btn {
+  background: rgba(43, 82, 120, 0.38);
+  border: 1px dashed rgba(100, 160, 220, 0.55);
+  color: rgba(255,255,255,0.82);
+}
+.transparent-btn:hover:not(:disabled) {
+  background: rgba(43, 82, 120, 0.55);
+  opacity: 1;
+}

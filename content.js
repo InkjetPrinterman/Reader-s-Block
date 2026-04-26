@@ -631,7 +631,7 @@
 
   // handleMessage — the single internal entry point for all incoming messages.
   // Registered as the chrome.runtime listener AND called directly for replays.
-  function handleMessage(msg) {
+  function handleMessage(msg, sendResponse) {
     // ── Live font resize ──────────────────────────────────────────────────
     if (msg.type === 'UPDATE_OVERLAY_FONT') {
       if (!activeBookTextEl) return;
@@ -736,28 +736,48 @@
         // Turning overlay off — hide immediately, stop any timer bar
         stopTimerBar();
         host.style.display = 'none';
+        return true; // sendResponse not needed for OFF
       } else {
-        // Turning overlay on — show, then immediately query the SW for current
-        // rand state so the timer bar reconciles without waiting for the next tick.
-        if (lastDisplayMsg) {
+        // ── Deterministic ON rule ───────────────────────────────────────────
+        // Always reply to the popup immediately so it knows whether we had
+        // cached content.  If we do, replay it now (potentially updating font,
+        // blur, chunkWords from the fresh settings the popup just sent).
+        // If we don't, reply hadContent:false so the popup can trigger a
+        // FORCE_DISPATCH via the service worker.
+        const hadContent = !!lastDisplayMsg;
+
+        if (hadContent) {
+          // Merge any fresh settings from the popup into the cached message
+          // so the replay honours the latest slider values.
+          const replay = { ...lastDisplayMsg };
+          if (typeof msg.fontSize    === 'number') replay.fontSize    = msg.fontSize;
+          if (typeof msg.chunkWords  === 'number') replay.chunkWords  = msg.chunkWords;
+          if (typeof msg.overlayBlur === 'number') replay.overlayBlur = msg.overlayBlur;
+
           host.style.display = '';
-          Promise.resolve().then(() => handleMessage(lastDisplayMsg));
+          // Run the replay in the next microtask so we can send the reply first.
+          Promise.resolve().then(() => handleMessage(replay));
+
+          // Async state query — arm the timer bar if the randomizer is ON.
+          chrome.runtime.sendMessage({ type: 'RAND_QUERY_STATE' }, (resp) => {
+            if (chrome.runtime.lastError || !resp) return;
+            if (!resp.randActive) return;
+            if (resp.randPhase === 'on' && resp.remaining > 0) {
+              startTimerBar(resp.remaining);
+            }
+          });
         } else {
+          // No cached content — just make the host visible; FORCE_DISPATCH
+          // (incoming DISPLAY_IN_OVERLAY) will populate it momentarily.
           host.style.display = '';
         }
-        // Async state query — does not block the display
-        chrome.runtime.sendMessage({ type: 'RAND_QUERY_STATE' }, (resp) => {
-          if (chrome.runtime.lastError || !resp) return;
-          if (!resp.randActive) return;
-          if (resp.randPhase === 'on' && resp.remaining > 0) {
-            // Overlay is in the ON phase — start the bar at current remaining time
-            startTimerBar(resp.remaining);
-          }
-          // If phase is 'in' (waiting to fade in), no bar shown — the fade-in
-          // will come from the SW tick via SET_OVERLAY_FADE when the time comes.
-        });
+
+        // sendResponse is available because the listener returned true below.
+        if (typeof sendResponse === 'function') {
+          sendResponse({ hadContent });
+        }
+        return; // don't fall through
       }
-      return;
     }
 
     // ── Smooth fade on/off — driven by the SW randomizer ─────────────────────
@@ -1692,5 +1712,10 @@
     });
   } // end handleMessage
 
-  chrome.runtime.onMessage.addListener((msg) => { handleMessage(msg); });
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    handleMessage(msg, sendResponse);
+    // Return true for SET_OVERLAY_ENABLED:ON so the popup's sendMessage
+    // callback receives the { hadContent } reply asynchronously.
+    if (msg.type === 'SET_OVERLAY_ENABLED' && msg.enabled) return true;
+  });
 })();

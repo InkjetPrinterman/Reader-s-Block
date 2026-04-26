@@ -543,6 +543,12 @@
   // page immediately, without the user needing to refresh or re-select the book.
   let lastDisplayMsg = null;
 
+  // ── Scroll position memory ─────────────────────────────────────────────────
+  // Keyed by bookId string so that returning to a book restores the last
+  // scroll position.  Populated just before the overlay fades out so the
+  // saved value is always the most recent reading position.
+  const scrollMemory = {};
+
   // ── Randomizer countdown bar helpers ─────────────────────────────────────
   // The bar uses a single CSS scaleX transition (transform-origin: left) so it
   // shrinks from full-width to nothing over exactly onDuration ms — perfectly
@@ -819,7 +825,12 @@
           });
         }
       } else {
-        // Fade out, then hide — stop the bar first
+        // Fade out, then hide — stop the bar first.
+        // Snapshot scroll position before the transition so it can be
+        // restored when the same book fades back in.
+        if (lastDisplayMsg?.bookId) {
+          scrollMemory[String(lastDisplayMsg.bookId)] = textEl.scrollTop;
+        }
         stopTimerBar();
         host.style.transition = `opacity ${dur}ms ease`;
         host.style.opacity    = '0';
@@ -1696,7 +1707,9 @@
       textEl.style.opacity = '1';
     }
 
-    textEl.scrollTop = 0;
+    // Restore the last scroll position for this book, or start from the top.
+    const savedScroll = msg.bookId ? (scrollMemory[String(msg.bookId)] ?? 0) : 0;
+    textEl.scrollTop = savedScroll;
 
     requestAnimationFrame(() => {
       // If wrapper dimensions were already locked by a previous book selection,

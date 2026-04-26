@@ -306,14 +306,51 @@ btnOverlayToggle.addEventListener('click', async () => {
   overlayEnabled = !overlayEnabled;
   saveOverlayEnabled();
   syncToggleBtn();
-  // Notify active tab
+
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) {
+    if (!tab?.id) return;
+
+    if (overlayEnabled) {
+      // ── Deterministic ON rule ─────────────────────────────────────────────
+      // When the overlay is switched ON we must immediately show content —
+      // either by replaying the most-recent selection stored on the content
+      // script, or, if no selection has ever been made this session, by
+      // triggering a fresh prefetch-and-dispatch via the service worker.
+      //
+      // Step 1: tell the content script the overlay is now enabled so it
+      //         can replay lastDisplayMsg if it has one.
+      // Step 2: query the SW for current rand state so we can also arm the
+      //         timer bar if the randomizer happens to be in its ON phase.
+      // Step 3: if the content script has no lastDisplayMsg yet, ask the SW
+      //         to force-dispatch the prefetched book immediately (or prefetch
+      //         one if none is cached yet).
+      const contentReply = await chrome.tabs.sendMessage(tab.id, {
+        type             : 'SET_OVERLAY_ENABLED',
+        enabled          : true,
+        fontSize         : overlayFontSize,
+        chunkWords       : chunkWords,
+        overlayBlur      : overlayBlur,
+      }).catch(() => null);
+
+      // contentReply is { hadContent: bool } — truthy only if content.js
+      // already had a lastDisplayMsg to replay. If not, trigger a dispatch.
+      if (!contentReply?.hadContent) {
+        // Ask the SW to immediately dispatch the prefetched book (or fetch one).
+        chrome.runtime.sendMessage({
+          type         : 'FORCE_DISPATCH',
+          tabId        : tab.id,
+          fontSize     : overlayFontSize,
+          chunkWords   : chunkWords,
+          overlayBlur  : overlayBlur,
+        }).catch(() => {});
+      }
+    } else {
+      // Turning overlay OFF — straightforward hide message.
       await chrome.tabs.sendMessage(tab.id, {
         type   : 'SET_OVERLAY_ENABLED',
-        enabled: overlayEnabled,
-      });
+        enabled: false,
+      }).catch(() => {});
     }
   } catch (_) {}
 });
@@ -833,6 +870,16 @@ async function sendToOverlay(book, transparent = false) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) throw new Error('Could not find the active tab.');
 
+    // ── Deterministic selection rule ──────────────────────────────────────
+    // Making a manual selection always forces the overlay ON, regardless of
+    // the current toggle state.  Update both in-memory state and storage so
+    // the toggle button and badge stay in sync, then send the content.
+    if (!overlayEnabled) {
+      overlayEnabled = true;
+      saveOverlayEnabled();
+      syncToggleBtn();
+    }
+
     await chrome.tabs.sendMessage(tab.id, {
       type       : 'DISPLAY_IN_OVERLAY',
       title      : `${book.title} — ${book.author}`,
@@ -879,6 +926,14 @@ async function sendToOverlayHtml(book) {
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) throw new Error('Could not find the active tab.');
+
+    // ── Deterministic selection rule ──────────────────────────────────────
+    // Making a manual selection always forces the overlay ON.
+    if (!overlayEnabled) {
+      overlayEnabled = true;
+      saveOverlayEnabled();
+      syncToggleBtn();
+    }
 
     await chrome.tabs.sendMessage(tab.id, {
       type       : 'DISPLAY_IN_OVERLAY',

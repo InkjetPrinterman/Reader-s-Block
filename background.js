@@ -278,10 +278,15 @@ async function advancePhase(tabId, s) {
   }
 }
 
-// Dispatch DISPLAY_IN_OVERLAY then SET_OVERLAY_FADE to the content script.
-// Called both when book is immediately available and when the onChanged
-// listener fires after a delayed write.
-async function dispatchFadeIn(tabId, book) {
+// dispatchFadeInWithSettings — send DISPLAY_IN_OVERLAY + SET_OVERLAY_FADE
+// using explicitly supplied (or storage-read) user settings.
+async function dispatchFadeInWithSettings(tabId, book, settings = {}) {
+  // Load global settings from storage if caller didn't supply them.
+  const stored = await chrome.storage.local.get(['overlayFontSize', 'chunkWords', 'overlayBlur']);
+  const fontSize   = settings.fontSize   ?? stored.overlayFontSize ?? 28;
+  const chunkWords = settings.chunkWords ?? stored.chunkWords      ?? 150;
+  const overlayBlur= settings.overlayBlur ?? stored.overlayBlur   ?? 20;
+
   try {
     await chrome.tabs.sendMessage(tabId, {
       type       : 'DISPLAY_IN_OVERLAY',
@@ -289,9 +294,9 @@ async function dispatchFadeIn(tabId, book) {
       html       : book.html,
       bookId     : String(book.bookId),
       transparent: false,
-      fontSize   : 28,
-      chunkWords : 150,
-      overlayBlur: 20,
+      fontSize,
+      chunkWords,
+      overlayBlur,
     });
   } catch (_) {}
 
@@ -301,6 +306,13 @@ async function dispatchFadeIn(tabId, book) {
     type      : 'START_RAND_TIMER',
     onDuration: RAND_ON_DURATION,
   }).catch(() => {});
+}
+
+// Dispatch DISPLAY_IN_OVERLAY then SET_OVERLAY_FADE to the content script.
+// Called both when book is immediately available and when the onChanged
+// listener fires after a delayed write.
+async function dispatchFadeIn(tabId, book) {
+  await dispatchFadeInWithSettings(tabId, book);
 }
 
 // ── Book prefetch — ordered by popup feed list ────────────────────────────────
@@ -495,7 +507,50 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return false;
   }
 
-  // ── PREFETCH_BOOK — popup explicitly requests a fresh prefetch ────────────
+// ── FORCE_DISPATCH — popup requests an immediate overlay show ─────────────
+// Sent when the user flips the overlay toggle ON and the content script
+// reports it has no cached lastDisplayMsg to replay.  We dispatch the
+// prefetched book if one is ready, or trigger a fresh prefetch and wait
+// for it via the storage-onChanged gate (same path as advancePhase).
+if (msg.type === 'FORCE_DISPATCH') {
+  const { tabId, fontSize, chunkWords, overlayBlur } = msg;
+  if (!tabId) return false;
+
+  (async () => {
+    const prefetchKey  = `prefetchedBook__${tabId}`;
+    const prefetchData = await chrome.storage.local.get(prefetchKey);
+    const book         = prefetchData[prefetchKey];
+
+    if (book?.html) {
+      // Book ready — dispatch immediately with user settings.
+      await dispatchFadeInWithSettings(tabId, book, { fontSize, chunkWords, overlayBlur });
+    } else {
+      // Nothing cached yet — prefetch then dispatch via onChanged gate.
+      tabsPendingFadeIn.add(tabId);
+      const listener = (changes, area) => {
+        if (area !== 'local' || !changes[prefetchKey]) return;
+        const arrived = changes[prefetchKey].newValue;
+        if (!arrived?.html) return;
+        chrome.storage.onChanged.removeListener(listener);
+        tabsPendingFadeIn.delete(tabId);
+        dispatchFadeInWithSettings(tabId, arrived, { fontSize, chunkWords, overlayBlur }).catch(() => {});
+      };
+      chrome.storage.onChanged.addListener(listener);
+      // Safety timeout — 30 s, same as advancePhase gate.
+      setTimeout(() => {
+        if (!tabsPendingFadeIn.has(tabId)) return;
+        chrome.storage.onChanged.removeListener(listener);
+        tabsPendingFadeIn.delete(tabId);
+        // Show overlay even with no content so the toggle feels responsive.
+        fadeTab(tabId, true);
+        updateBadge(true);
+      }, 30000);
+      prefetchBookForTab(tabId);
+    }
+  })();
+  return false;
+}
+
   if (msg.type === 'PREFETCH_BOOK') {
     const { tabId } = msg;
     if (tabId) prefetchBookForTab(tabId);

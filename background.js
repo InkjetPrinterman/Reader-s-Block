@@ -61,6 +61,56 @@ const KEEPALIVE_NAME    = 'rand_keepalive';
 let activeTabs     = new Set();
 let tickIntervalId = null;
 
+// ── Auto-arm randomizer on tab lifecycle events ───────────────────────────────
+// The randomizer must run independently of the popup being open.  We hook
+// chrome.tabs.onCreated and chrome.tabs.onActivated so the SW arms each tab
+// the first time it is seen, then re-arms it whenever the user switches to it.
+// This mirrors the logic previously living in popup.js switchToTab() so the
+// popup only needs to handle display — not to be open for the timer to run.
+
+chrome.tabs.onCreated.addListener((tab) => {
+  // Arm the new tab immediately in phase IN so a book starts prefetching.
+  autoArmTab(tab.id);
+});
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  autoArmTab(tabId);
+});
+
+async function autoArmTab(tabId) {
+  try {
+    // Skip non-normal tabs (devtools, extensions, etc.).
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab || tab.url?.startsWith('chrome')) return;
+  } catch (_) { return; }
+
+  const s = await loadTabState(tabId);
+  if (s.randActive) {
+    // Already armed — just ensure the tick is running (SW may have been
+    // suspended and lost the interval).
+    activeTabs.add(tabId);
+    await persistActiveTabs();
+    ensureKeepaliveAlarm();
+    ensureTickRunning();
+    return;
+  }
+
+  // Fresh tab — arm phase IN and start prefetching.
+  const intervalMs  = RAND_WINDOW_MS / Math.max(s.randFreq, 1);
+  const phaseEnds   = Date.now() + intervalMs;
+  await saveTabState(tabId, {
+    randActive    : true,
+    randPhase     : 'in',
+    randPhaseEnds : phaseEnds,
+    overlayEnabled: false,   // overlay OFF by default on new tabs
+  });
+  activeTabs.add(tabId);
+  await persistActiveTabs();
+  ensureKeepaliveAlarm();
+  ensureTickRunning();
+  prefetchBookForTab(tabId);
+}
+
 // ── Install / activate ────────────────────────────────────────────────────────
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -584,6 +634,31 @@ if (msg.type === 'FORCE_DISPATCH') {
       });
     });
     return true; // async response
+  }
+
+  // ── RESET_RAND_TIMER — manual book selection resets ON-phase countdown ──────
+  // Sent by popup.js when the user picks Read on Page / Read with Images /
+  // Read as You Type.  If the randomizer is active, we restart the ON phase
+  // so the overlay stays visible for a full RAND_ON_DURATION from now.
+  if (msg.type === 'RESET_RAND_TIMER') {
+    const { tabId } = msg;
+    if (!tabId) return false;
+    (async () => {
+      const s = await loadTabState(tabId);
+      if (!s.randActive) return;
+      const phaseEnds = Date.now() + RAND_ON_DURATION;
+      await saveTabState(tabId, {
+        overlayEnabled: true,
+        randPhase     : 'on',
+        randPhaseEnds : phaseEnds,
+      });
+      // Tell the content script to restart its visual timer bar.
+      chrome.tabs.sendMessage(tabId, {
+        type      : 'START_RAND_TIMER',
+        onDuration: RAND_ON_DURATION,
+      }).catch(() => {});
+    })();
+    return false;
   }
 
   // Legacy — no-op

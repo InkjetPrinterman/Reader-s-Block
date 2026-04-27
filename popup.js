@@ -188,19 +188,15 @@ function tabStateKey(tabId) {
 }
 
 // Load state for a given tab. Returns defaults if nothing stored.
-// `fresh` is true when there is no stored entry — used by switchToTab to
-// trigger auto-arm and book prefetch on first-ever load for this tab.
 async function loadTabState(tabId) {
   const key  = tabStateKey(tabId);
   const data = await chrome.storage.local.get(key);
   const s    = data[key] || {};
-  const fresh = !data[key];
   return {
     overlayEnabled: s.overlayEnabled === true,
-    randActive    : fresh ? true : (s.randActive === true),
+    randActive    : s.randActive === true,
     randPhase     : s.randPhase === 'on' ? 'on' : 'in',
     randPhaseEnds : typeof s.randPhaseEnds === 'number' ? s.randPhaseEnds : 0,
-    fresh,
   };
 }
 
@@ -246,16 +242,6 @@ async function switchToTab(tabId) {
     }
   }
 
-  // First-ever tab: arm phase IN immediately and kick off silent book prefetch.
-  if (s.fresh) {
-    randPhase     = 'in';
-    randPhaseEnds = Date.now() + randIntervalMs();
-    saveTabState();
-    renderCountdown(randPhase, randPhaseEnds - Date.now());
-    armBackground(randPhase, randPhaseEnds);
-    // Fire-and-forget — never blocks the UI
-    prefetchRandomBook(tabId);
-  }
 }
 
 // ── Overlay enabled (now per-tab) ─────────────────────────────────────────────
@@ -890,6 +876,10 @@ async function sendToOverlay(book, transparent = false) {
       overlayBlur: overlayBlur,
     });
 
+    // Reset the randomizer ON-phase so the user has a full reading window
+    // from the moment they make a manual selection.
+    chrome.runtime.sendMessage({ type: 'RESET_RAND_TIMER', tabId: tab.id }).catch(() => {});
+
     // Close the popup — the user's focus should move to the page
     window.close();
 
@@ -945,6 +935,10 @@ async function sendToOverlayHtml(book) {
       chunkWords : chunkWords,
       overlayBlur: overlayBlur,
     });
+
+    // Reset the randomizer ON-phase so the user has a full reading window
+    // from the moment they make a manual selection.
+    chrome.runtime.sendMessage({ type: 'RESET_RAND_TIMER', tabId: tab.id }).catch(() => {});
 
     window.close();
 

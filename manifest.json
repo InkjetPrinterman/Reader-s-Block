@@ -5,6 +5,7 @@
   "description": "Full text in the popup or on the page",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "tabs",
     "alarms"
   ],

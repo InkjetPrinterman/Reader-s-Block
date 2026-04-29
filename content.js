@@ -543,12 +543,6 @@
   // page immediately, without the user needing to refresh or re-select the book.
   let lastDisplayMsg = null;
 
-  // ── Scroll position memory ─────────────────────────────────────────────────
-  // Keyed by bookId string so that returning to a book restores the last
-  // scroll position.  Populated just before the overlay fades out so the
-  // saved value is always the most recent reading position.
-  const scrollMemory = {};
-
   // ── Randomizer countdown bar helpers ─────────────────────────────────────
   // The bar uses a single CSS scaleX transition (transform-origin: left) so it
   // shrinks from full-width to nothing over exactly onDuration ms — perfectly
@@ -825,12 +819,7 @@
           });
         }
       } else {
-        // Fade out, then hide — stop the bar first.
-        // Snapshot scroll position before the transition so it can be
-        // restored when the same book fades back in.
-        if (lastDisplayMsg?.bookId) {
-          scrollMemory[String(lastDisplayMsg.bookId)] = textEl.scrollTop;
-        }
+        // Fade out, then hide — stop the bar first
         stopTimerBar();
         host.style.transition = `opacity ${dur}ms ease`;
         host.style.opacity    = '0';
@@ -852,6 +841,12 @@
 
     // Cache for replay when the toggle is turned back on.
     lastDisplayMsg = msg;
+
+    // ── Failsafe: abort if no book title is present ───────────────────────
+    // A missing title indicates an incomplete or malformed book payload.
+    // Displaying the overlay in this state would show contentless chrome,
+    // so we trap here and suppress the render entirely.
+    if (!msg.title || !msg.title.trim()) return;
 
     // Track which book is currently displayed for the bookmark toggle.
     setCurrentBookId(msg.bookId || null);
@@ -1707,9 +1702,7 @@
       textEl.style.opacity = '1';
     }
 
-    // Restore the last scroll position for this book, or start from the top.
-    const savedScroll = msg.bookId ? (scrollMemory[String(msg.bookId)] ?? 0) : 0;
-    textEl.scrollTop = savedScroll;
+    textEl.scrollTop = 0;
 
     requestAnimationFrame(() => {
       // If wrapper dimensions were already locked by a previous book selection,

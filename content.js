@@ -1,4 +1,9 @@
 (() => {
+  // ── Frame guard ───────────────────────────────────────────────────────────
+  // Abort immediately if running inside an iframe or embedded widget.
+  // The overlay must only ever attach to the top-level document.
+  if (window !== window.top) return;
+
   // ── 2. Build host + Shadow DOM ────────────────────────────────────────────
   const host   = document.createElement('div');
   host.id      = 'liquid-glass-extension-root';
@@ -422,6 +427,15 @@
 
   textEl.addEventListener('input', applyConstraints);
 
+  // ── Wheel forwarding ───────────────────────────────────────────────────────
+  // .lg-text-scroll has overflow:hidden so wheel events on the host never
+  // naturally reach textEl.  We capture them on the shadow host and forward
+  // deltaY directly, then prevent the page from scrolling underneath.
+  host.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    textEl.scrollTop += e.deltaY;
+  }, { passive: false });
+
   window.addEventListener('resize', () => {
     measureChromeHeight();
     applyConstraints();
@@ -542,6 +556,18 @@
   // Stored so that SET_OVERLAY_ENABLED:true can replay the last book onto the
   // page immediately, without the user needing to refresh or re-select the book.
   let lastDisplayMsg = null;
+
+  // ── Content-ready gate ────────────────────────────────────────────────────
+  // Flips to true only after DISPLAY_IN_OVERLAY passes the title trap and
+  // successfully populates the DOM.  SET_OVERLAY_FADE checks this flag before
+  // applying any CSS transitions, preventing the overlay from becoming visible
+  // with empty content if the two messages arrive out of expected order.
+  let contentReady = false;
+
+  // ── Scroll position memory ────────────────────────────────────────────────
+  // Keyed by bookId string so that returning to a book restores the last
+  // reading position across consecutive overlay fade cycles.
+  const scrollMemory = {};
 
   // ── Randomizer countdown bar helpers ─────────────────────────────────────
   // The bar uses a single CSS scaleX transition (transform-origin: left) so it
@@ -795,6 +821,13 @@
         // (via dispatchFadeIn), so lastDisplayMsg is already populated.
         userDismissed = false;
 
+        // ── Visibility gate ───────────────────────────────────────────────
+        // Only proceed if DISPLAY_IN_OVERLAY successfully passed the title
+        // trap and populated the DOM.  If contentReady is false the payload
+        // was incomplete; applying CSS transitions here would produce a
+        // visible but empty overlay, so abort unconditionally.
+        if (!contentReady) return;
+
         if (lastDisplayMsg) {
           host.style.opacity    = '0';
           host.style.transition = `opacity ${dur}ms ease`;
@@ -819,7 +852,12 @@
           });
         }
       } else {
-        // Fade out, then hide — stop the bar first
+        // Fade out, then hide — stop the bar first.
+        // Snapshot scroll position before the transition so it can be
+        // restored when the same book fades back in.
+        if (lastDisplayMsg?.bookId) {
+          scrollMemory[String(lastDisplayMsg.bookId)] = textEl.scrollTop;
+        }
         stopTimerBar();
         host.style.transition = `opacity ${dur}ms ease`;
         host.style.opacity    = '0';
@@ -844,9 +882,15 @@
 
     // ── Failsafe: abort if no book title is present ───────────────────────
     // A missing title indicates an incomplete or malformed book payload.
-    // Displaying the overlay in this state would show contentless chrome,
-    // so we trap here and suppress the render entirely.
-    if (!msg.title || !msg.title.trim()) return;
+    // contentReady is set false so SET_OVERLAY_FADE cannot make an empty
+    // overlay visible even if it fires independently after this abort.
+    if (!msg.title || !msg.title.trim()) {
+      contentReady = false;
+      return;
+    }
+
+    // Title confirmed — DOM population proceeds; arm the visibility gate.
+    contentReady = true;
 
     // Track which book is currently displayed for the bookmark toggle.
     setCurrentBookId(msg.bookId || null);
@@ -1702,7 +1746,9 @@
       textEl.style.opacity = '1';
     }
 
-    textEl.scrollTop = 0;
+    // Restore the last scroll position for this book, or start from the top.
+    const savedScroll = msg.bookId ? (scrollMemory[String(msg.bookId)] ?? 0) : 0;
+    textEl.scrollTop = savedScroll;
 
     requestAnimationFrame(() => {
       // If wrapper dimensions were already locked by a previous book selection,

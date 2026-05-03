@@ -5,5 +5,5 @@ You can also practice your typing skills by choosing a book title with the "Read
 
 DOWNLOAD ZIP - UNPACK ZIP - TURN ON DEVELOPER MODE IN YOUR BROWSER EXTENSIONS OVERVIEW - LOAD FOLDER AS UNPACKED EXTENSION - GITHUB PACKS MAIN FOLDER AS SUB FOLDER TO FOLDER NAMED  "Reader-s-Block-main"
 
-This is a very early version, please forgive an occasional unexpected overlay on some sites as different websites have little differences in how they load and refresh canvas material. 
+This is a very early version, please forgive an occasional unexpected overlay on some sites as different sites have little differences in how they load and refresh canvas material. 
 
